@@ -8,49 +8,41 @@ export default function Layout() {
   const toast = useAppStore((s) => s.toast);
   const clearToast = useAppStore((s) => s.clearToast);
   const [reindexOpen, setReindexOpen] = useState(false);
+
   const navClass = ({ isActive }: { isActive: boolean }) =>
-    `block px-4 py-2 rounded text-sm font-medium transition-colors ${
-      isActive ? 'bg-slate-700 text-white' : 'text-slate-300 hover:bg-slate-800 hover:text-white'
-    }`;
+    isActive
+      ? 'bg-slate-100 text-slate-900 rounded-md px-3 py-1.5 text-sm font-medium'
+      : 'text-slate-500 hover:text-slate-800 hover:bg-slate-50 rounded-md px-3 py-1.5 text-sm';
 
   return (
-    <div className="flex h-screen bg-slate-50">
-      {/* Sidebar */}
-      <aside className="w-56 bg-slate-900 text-white flex flex-col shrink-0">
-        <div className="px-4 py-4 border-b border-slate-700">
-          <h1 className="text-xl font-bold text-white tracking-tight">Illusion UI</h1>
-          <p className="text-xs text-slate-400 mt-0.5">Data Mapping System</p>
-        </div>
-        <div className="border-b border-slate-700">
-          <CountryLangSelector />
-        </div>
-        <nav className="flex-1 px-2 py-3 space-y-1">
-          <NavLink to="/ukeys" className={navClass}>
-            🔍 Ukey Explorer
-          </NavLink>
-          <NavLink to="/configs" className={navClass}>
-            📋 Mapping Configs
-          </NavLink>
-          <NavLink to="/templates" className={navClass}>
-            🎨 Templates
-          </NavLink>
-        </nav>
-        <div className="px-4 py-3 border-t border-slate-700">
-          <button
-            onClick={() => setReindexOpen(true)}
-            className="w-full flex items-center gap-2 px-3 py-2 rounded bg-slate-800 hover:bg-blue-700 text-slate-300 hover:text-white text-sm font-medium transition-colors mb-3">
-            🔄 Re-Indexieren
-          </button>
-          <p className="text-xs text-slate-500">Illusion v1.0</p>
-        </div>
-      </aside>
+    <div className="flex flex-col h-screen bg-slate-50">
+      {/* Top shell */}
+      <header className="flex items-center gap-1 px-4 h-12 bg-white border-b border-slate-200 shadow-sm shrink-0">
+        <span className="font-bold text-slate-800 text-sm mr-4">Illusion</span>
 
-      {/* Main content */}
-      <main className="flex-1 overflow-hidden flex flex-col">
+        <nav className="flex items-center gap-1">
+          <NavLink to="/ukeys" className={navClass}>🔍 Ukeys</NavLink>
+          <NavLink to="/configs" className={navClass}>📋 Configs</NavLink>
+          <NavLink to="/templates" className={navClass}>🎨 Templates</NavLink>
+          <NavLink to="/quality" className={navClass}>📊 Qualität</NavLink>
+        </nav>
+
+        <div className="flex-1" />
+
+        <CountryLangSelector />
+
+        <button
+          onClick={() => setReindexOpen(true)}
+          className="ml-2 flex items-center gap-1.5 px-3 py-1.5 rounded-md bg-slate-100 hover:bg-blue-600 text-slate-600 hover:text-white text-sm font-medium transition-colors">
+          🔄 Reindex
+        </button>
+      </header>
+
+      {/* Page content */}
+      <main className="flex-1 overflow-hidden">
         <Outlet />
       </main>
 
-      {/* Toast */}
       {toast && (
         <div
           onClick={clearToast}

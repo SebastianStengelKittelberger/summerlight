@@ -41,3 +41,9 @@ export interface TemplateProperties {
   labels: Record<string, string>;
   slots: SlotConfig[];
 }
+
+export interface DataQuality {
+  ukey: string;
+  percentage: string; // e.g. "80% haben den UKEY. Das sind 8 von 10 Skus."
+  skusWithoutUkey: string[];
+}

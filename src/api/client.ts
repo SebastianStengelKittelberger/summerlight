@@ -1,5 +1,5 @@
 import axios from 'axios';
-import type { InformationResponse, MapConfig, TemplateProperties } from '../types';
+import type { InformationResponse, MapConfig, TemplateProperties, DataQuality } from '../types';
 
 const api = axios.create({
   baseURL: 'http://localhost:8079/illusion',
@@ -23,6 +23,14 @@ export function loadMappingConfig(
   language: string,
 ): Promise<MapConfig[]> {
   return api.get<MapConfig[]>(`/${country}/${language}/mapping-config`).then((r) => r.data);
+}
+
+export function loadDataQuality(
+  country: string,
+  language: string,
+  ukey: string,
+): Promise<DataQuality> {
+  return api.get<DataQuality>(`/${country}/${language}/dataQuality/${ukey}/`).then((r) => r.data);
 }
 
 export function saveMappingConfig(
@@ -97,6 +105,26 @@ export function saveVorlage(name: string, html: string): Promise<void> {
   }).then(() => undefined);
 }
 
+export function deleteVorlage(name: string): Promise<void> {
+  return moonlightApi.delete(`/vorlage/${name}`).then(() => undefined);
+}
+
+export interface VorlageVersion {
+  id: string;
+  timestamp: string;
+}
+
+export function loadVorlageHistory(name: string): Promise<VorlageVersion[]> {
+  return moonlightApi.get<VorlageVersion[]>(`/vorlage/${name}/history`).then(r => r.data);
+}
+
+export function loadVorlageVersionHtml(name: string, historyId: string): Promise<string> {
+  return moonlightApi.get<string>(`/vorlage/${name}/history/${historyId}`, {
+    responseType: 'text',
+    headers: { Accept: 'text/html,text/plain,*/*' },
+  }).then(r => r.data);
+}
+
 export function loadSlotTemplate(country: string, language: string, slot: string): Promise<string> {
   return moonlightApi.get<string>(`/${country}/${language}/template/${slot}`, {
     responseType: 'text',
@@ -112,4 +140,13 @@ export function saveSlotTemplate(country: string, language: string, slot: string
 
 export function listSlots(country: string, language: string): Promise<string[]> {
   return moonlightApi.get<string[]>(`/${country}/${language}/templates`).then((r) => r.data);
+}
+
+export interface SkuValue {
+  sku: string;
+  value: string;
+}
+
+export function loadSkuValues(country: string, language: string, ukey: string): Promise<SkuValue[]> {
+  return api.get<SkuValue[]>(`/${country}/${language}/dataQuality/${ukey}/values`).then(r => r.data);
 }
