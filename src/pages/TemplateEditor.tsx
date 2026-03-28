@@ -210,6 +210,8 @@ export default function TemplateEditor() {
 
   const [mappingConfigs, setMappingConfigs] = useState<MapConfig[]>([]);
   const [quickMap, setQuickMap] = useState<QuickMapState | null>(null);
+  const [insertUkeyOpen, setInsertUkeyOpen] = useState(false);
+  const [insertUkeySearch, setInsertUkeySearch] = useState('');
   const [previewSku, setPreviewSku] = useState('');
   const [loadingSampleSku, setLoadingSampleSku] = useState(false);
   const [draggedVorlage, setDraggedVorlage] = useState<string | null>(null);
@@ -554,6 +556,13 @@ export default function TemplateEditor() {
   const mappedUkeys   = [...new Set([...ukeyInfo.mappedSkuUkeys,   ...ukeyInfo.mappedProductUkeys])].sort();
   const unmappedSkuSet = new Set(ukeyInfo.unmappedSkuUkeys);
   const mappedSkuSet   = new Set(ukeyInfo.mappedSkuUkeys);
+
+  const allSkuUkeys     = new Set([...ukeyInfo.mappedSkuUkeys,     ...ukeyInfo.unmappedSkuUkeys]);
+  const allProductUkeys = new Set([...ukeyInfo.mappedProductUkeys, ...ukeyInfo.unmappedProductUkeys]);
+  const allUkeysWithType: { ukey: string; type: 'SKU' | 'PRODUCT' }[] = [
+    ...[...allSkuUkeys].map(u => ({ ukey: u, type: 'SKU' as const })),
+    ...[...allProductUkeys].filter(u => !allSkuUkeys.has(u)).map(u => ({ ukey: u, type: 'PRODUCT' as const })),
+  ].sort((a, b) => a.ukey.localeCompare(b.ukey));
 
   if (loading) {
     return <div className="flex items-center justify-center h-full text-slate-400">Lädt…</div>;
@@ -944,6 +953,16 @@ export default function TemplateEditor() {
                       showToast('Kein UKey unter dem Cursor gefunden', 'error');
                     },
                   });
+                  editor.addAction({
+                    id: 'insert-ukey',
+                    label: '📌 UKey einfügen…',
+                    contextMenuGroupId: 'navigation',
+                    contextMenuOrder: 1,
+                    run: () => {
+                      setInsertUkeySearch('');
+                      setInsertUkeyOpen(true);
+                    },
+                  });
                 }}
                 options={{ minimap: { enabled: true }, fontSize: 13, wordWrap: 'on', scrollBeyondLastLine: false, automaticLayout: true }}
               />
@@ -960,6 +979,53 @@ export default function TemplateEditor() {
       </div>
 
       {quickMap && <QuickMapModal initial={quickMap} onSave={handleQuickMapSave} onClose={() => setQuickMap(null)} />}
+
+      {insertUkeyOpen && (
+        <div className="fixed inset-0 z-50 flex items-start justify-center pt-24 bg-black/50" onClick={() => setInsertUkeyOpen(false)}>
+          <div className="bg-slate-800 border border-slate-600 rounded-lg shadow-xl w-96 max-h-[60vh] flex flex-col" onClick={e => e.stopPropagation()}>
+            <div className="flex items-center justify-between px-4 py-3 border-b border-slate-700">
+              <span className="text-sm font-semibold text-white">📌 UKey einfügen</span>
+              <button onClick={() => setInsertUkeyOpen(false)} className="text-slate-400 hover:text-white text-lg leading-none">✕</button>
+            </div>
+            <div className="px-3 py-2 border-b border-slate-700">
+              <input
+                autoFocus
+                type="text"
+                placeholder="UKey suchen…"
+                value={insertUkeySearch}
+                onChange={e => setInsertUkeySearch(e.target.value)}
+                className="w-full px-3 py-1.5 bg-slate-700 border border-slate-600 rounded text-xs text-white placeholder-slate-400 focus:outline-none focus:ring-1 focus:ring-indigo-500"
+              />
+            </div>
+            <div className="overflow-y-auto flex-1 py-1">
+              {allUkeysWithType
+                .filter(({ ukey }) => ukey.toLowerCase().includes(insertUkeySearch.toLowerCase()))
+                .map(({ ukey, type }) => (
+                  <button
+                    key={`${ukey}-${type}`}
+                    onClick={() => {
+                      handleCopyUkey(ukey, type);
+                      setInsertUkeyOpen(false);
+                    }}
+                    className="w-full flex items-center gap-2 px-4 py-1.5 hover:bg-slate-700 text-left transition-colors"
+                  >
+                    <span className={`text-[10px] px-1.5 py-0.5 rounded font-mono font-semibold shrink-0 ${type === 'SKU' ? 'bg-blue-700 text-blue-100' : 'bg-purple-700 text-purple-100'}`}>
+                      {type}
+                    </span>
+                    <span className="text-xs text-slate-200 font-mono truncate">{ukey}</span>
+                    {(type === 'SKU' ? mappedSkuSet : new Set(ukeyInfo.mappedProductUkeys)).has(ukey) && (
+                      <span className="ml-auto text-green-400 text-[10px] shrink-0">✔ gemappt</span>
+                    )}
+                  </button>
+                ))
+              }
+              {allUkeysWithType.filter(({ ukey }) => ukey.toLowerCase().includes(insertUkeySearch.toLowerCase())).length === 0 && (
+                <p className="text-xs text-slate-500 text-center py-4">Keine UKeys gefunden</p>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
       {mappedModalOpen && (
         <UkeyChipModal
           title={`🟢 Gemappte UKeys (${mappedUkeys.length})`}
