@@ -150,3 +150,7 @@ export interface SkuValue {
 export function loadSkuValues(country: string, language: string, ukey: string): Promise<SkuValue[]> {
   return api.get<SkuValue[]>(`/${country}/${language}/dataQuality/${ukey}/values`).then(r => r.data);
 }
+
+export function getSampleSkus(country: string, language: string, limit = 10): Promise<string[]> {
+  return api.get<string[]>(`/${country}/${language}/skus`, { params: { limit } }).then(r => r.data);
+}

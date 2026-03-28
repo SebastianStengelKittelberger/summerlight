@@ -10,6 +10,7 @@ import {
   loadUkeys,
   loadMappingConfig,
   saveMappingConfig,
+  getSampleSkus,
 } from '../api/client';
 import type { VorlageVersion } from '../api/client';
 import type { MapConfig, TemplateProperties, SlotConfig, DTOType, MappingType, TargetFieldType, TargetType } from '../types';
@@ -210,6 +211,7 @@ export default function TemplateEditor() {
   const [mappingConfigs, setMappingConfigs] = useState<MapConfig[]>([]);
   const [quickMap, setQuickMap] = useState<QuickMapState | null>(null);
   const [previewSku, setPreviewSku] = useState('');
+  const [loadingSampleSku, setLoadingSampleSku] = useState(false);
   const [draggedVorlage, setDraggedVorlage] = useState<string | null>(null);
   const [dropTargetPage, setDropTargetPage] = useState<string | null>(null);
   const editorRef = useRef<Monaco.editor.IStandaloneCodeEditor | null>(null);
@@ -827,9 +829,25 @@ export default function TemplateEditor() {
 
             <div className="w-px h-4 bg-slate-600" />
 
-            <input type="text" placeholder="SKU Preview"
+            <input type="text" placeholder="SKU für Preview"
               value={previewSku} onChange={e => setPreviewSku(e.target.value)}
-              className="px-2 py-1 bg-slate-700 border border-slate-600 rounded text-xs text-white placeholder-slate-400 w-28 focus:outline-none focus:ring-1 focus:ring-slate-500" />
+              className="px-2 py-1 bg-slate-700 border border-slate-600 rounded text-xs text-white placeholder-slate-400 w-32 focus:outline-none focus:ring-1 focus:ring-slate-500" />
+
+            <button
+              onClick={async () => {
+                setLoadingSampleSku(true);
+                try {
+                  const skus = await getSampleSkus(country, language, 1);
+                  if (skus.length > 0) setPreviewSku(skus[0]);
+                } finally {
+                  setLoadingSampleSku(false);
+                }
+              }}
+              disabled={loadingSampleSku}
+              title="Beispiel-SKU aus dem System laden"
+              className="flex items-center gap-1 px-2 py-1 rounded bg-slate-700 hover:bg-slate-600 text-slate-300 text-xs transition-colors disabled:opacity-50">
+              {loadingSampleSku ? '⏳' : '🎲'}
+            </button>
 
             <button onClick={() => window.open(`http://localhost:8078/moonlight/${country}/${language}/product-${previewSku || 'EXAMPLE'}?page=${activePage}`, '_blank')}
               className="flex items-center gap-1 px-2.5 py-1 rounded bg-slate-700 hover:bg-slate-600 text-slate-200 text-xs transition-colors">
