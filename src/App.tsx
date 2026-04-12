@@ -5,6 +5,7 @@ import MappingConfigList from './pages/MappingConfigList';
 import MapConfigEditor from './pages/MapConfigEditor';
 import TemplateEditor from './pages/TemplateEditor';
 import DataQualityDashboard from './pages/DataQualityDashboard';
+import RoutingEditor from './pages/RoutingEditor';
 
 export default function App() {
   return (
@@ -17,6 +18,7 @@ export default function App() {
           <Route path="editor" element={<MapConfigEditor />} />
           <Route path="templates" element={<TemplateEditor />} />
           <Route path="quality" element={<DataQualityDashboard />} />
+          <Route path="routing" element={<RoutingEditor />} />
         </Route>
       </Routes>
     </BrowserRouter>

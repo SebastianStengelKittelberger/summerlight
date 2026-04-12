@@ -54,14 +54,6 @@ const moonlightApi = axios.create({
   headers: { 'Content-Type': 'application/json' },
 });
 
-export function loadTemplateConfig(country: string, language: string): Promise<TemplateProperties> {
-  return moonlightApi.get<TemplateProperties>(`/${country}/${language}/config`).then((r) => r.data);
-}
-
-export function saveTemplateConfig(country: string, language: string, config: TemplateProperties): Promise<void> {
-  return moonlightApi.put(`/${country}/${language}/config`, config).then(() => undefined);
-}
-
 // ── Seiten ────────────────────────────────────────────────────────────────────
 
 export function listPages(country: string, language: string): Promise<string[]> {
@@ -125,23 +117,6 @@ export function loadVorlageVersionHtml(name: string, historyId: string): Promise
   }).then(r => r.data);
 }
 
-export function loadSlotTemplate(country: string, language: string, slot: string): Promise<string> {
-  return moonlightApi.get<string>(`/${country}/${language}/template/${slot}`, {
-    responseType: 'text',
-    headers: { Accept: 'text/html,text/plain,*/*' },
-  }).then((r) => r.data);
-}
-
-export function saveSlotTemplate(country: string, language: string, slot: string, html: string): Promise<void> {
-  return moonlightApi.put(`/${country}/${language}/template/${slot}`, html, {
-    headers: { 'Content-Type': 'text/plain' },
-  }).then(() => undefined);
-}
-
-export function listSlots(country: string, language: string): Promise<string[]> {
-  return moonlightApi.get<string[]>(`/${country}/${language}/templates`).then((r) => r.data);
-}
-
 export interface SkuValue {
   sku: string;
   value: string;
@@ -153,4 +128,12 @@ export function loadSkuValues(country: string, language: string, ukey: string): 
 
 export function getSampleSkus(country: string, language: string, limit = 10): Promise<string[]> {
   return api.get<string[]>(`/${country}/${language}/skus`, { params: { limit } }).then(r => r.data);
+}
+
+export function loadRoutes(country: string, language: string): Promise<import('../types').RouteConfig[]> {
+  return moonlightApi.get(`/${country}/${language}/routes`).then(r => r.data);
+}
+
+export function saveRoutes(country: string, language: string, routes: import('../types').RouteConfig[]): Promise<void> {
+  return moonlightApi.put(`/${country}/${language}/routes`, routes).then(() => undefined);
 }

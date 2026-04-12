@@ -1,6 +1,53 @@
-# React + TypeScript + Vite
+# Summerlight
 
-This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
+Pflege-UI für das **illusion**-System. React/TypeScript/Vite SPA.
+
+## Start
+
+```bash
+npm install
+npm run dev   # http://localhost:5173
+```
+
+## Bereiche
+
+| Route | Beschreibung |
+|-------|--------------|
+| `/ukeys` | UKeys erkunden — gemappt vs. ungemappt, filterbar nach SKU |
+| `/configs` | Mapping-Regeln verwalten (CRUD, JSON-Import/Export, Re-Index) |
+| `/editor` | Mapping-Config im Detail bearbeiten (Text, Image, Complex, Java-Code, Varianten) |
+| `/templates` | HTML-Vorlagen und Seiten bearbeiten, Slot-Konfiguration, Visual Edit Mode |
+| `/routing` | URL-Routing-Tabelle pflegen — Pfade auf Seiten mappen |
+| `/quality` | Datenqualitäts-Dashboard — Vollständigkeit pro UKey |
+
+## Template Editor — Visual Edit Mode
+
+Im Edit Mode kann auf jedes gerenderte Feld geklickt werden:
+- Klick öffnet UKey-Picker Modal
+- UKey direkt austauschen — Vorlage wird automatisch gespeichert
+- Unmapped UKeys können direkt als neues Mapping angelegt werden
+
+## URL-Routing
+
+Unter `/routing` lassen sich beliebige URL-Pfade auf Moonlight-Seiten mappen:
+
+```
+/ueber-uns        → CMS_PAGE     → cms-about
+/produkte/{sku}   → PRODUCT_PAGE → stage-produktseite
+```
+
+Moonlight rendert die Seite unter:
+```
+http://localhost:8078/moonlight/{country}/{language}{url}
+```
+
+## Backends
+
+| Service | URL | Beschreibung |
+|---------|-----|--------------|
+| illusion | http://localhost:8079/illusion | Mapping, Indexierung, Datenqualität |
+| moonlight | http://localhost:8078/moonlight | Template-Rendering, Seiten, Vorlagen |
+
 
 Currently, two official plugins are available:
 

@@ -86,7 +86,7 @@ function QuickMapModal({
               <label className="block text-xs font-medium text-slate-600 mb-1">Target Field Type</label>
               <select value={form.targetFieldType} onChange={e => set('targetFieldType', e.target.value as TargetFieldType)}
                 className="w-full border border-slate-300 rounded px-3 py-1.5 text-sm bg-white">
-                {(['STRING', 'IMAGE'] as TargetFieldType[]).map(v => <option key={v}>{v}</option>)}
+                {(['STRING', 'IMAGE', 'LIST'] as TargetFieldType[]).map(v => <option key={v}>{v}</option>)}
               </select>
             </div>
             <div>
@@ -222,6 +222,23 @@ export default function TemplateEditor() {
   const [splitPreview, setSplitPreview] = useState(false);
   const [previewKey, setPreviewKey] = useState(0);
 
+  // Visual Edit Mode
+  const iframeRef = useRef<HTMLIFrameElement | null>(null);
+  const [editModeOpen, setEditModeOpen] = useState(false);
+  interface UkeyClickState {
+    ukey: string;
+    dtype: string;
+    index: number;
+    vorlage: string;
+    fieldtype: 'IMAGE' | 'TEXT';
+    currentValue: string;
+  }
+  const [ukeyClickPopover, setUkeyClickPopover] = useState<UkeyClickState | null>(null);
+  const [ukeyPopoverSearch, setUkeyPopoverSearch] = useState('');
+  const [pendingNewUkey, setPendingNewUkey] = useState<{ ukey: string; type: 'SKU' | 'PRODUCT' } | null>(null);
+  // Remembers what needs to be replaced in the template when QuickMapModal is opened from Edit Mode
+  const [pendingReplacement, setPendingReplacement] = useState<{ oldUkey: string; index: number; vorlage: string } | null>(null);
+
   // Feature 2: Vorlage umbenennen
   const [renamingVorlage, setRenamingVorlage] = useState<string | null>(null);
   const [renameValue, setRenameValue] = useState('');
@@ -308,8 +325,17 @@ export default function TemplateEditor() {
       showToast(`"${cfg.ukey}" zur MappingConfig hinzugefügt`);
     } catch {
       showToast('Fehler beim Speichern der MappingConfig', 'error');
+      setQuickMap(null);
+      return;
     }
     setQuickMap(null);
+
+    // If opened from Edit Mode: also replace the old UKey in the template
+    if (pendingReplacement) {
+      const { oldUkey, index, vorlage } = pendingReplacement;
+      setPendingReplacement(null);
+      await handleUkeyReplace(oldUkey, cfg.ukey, index, vorlage);
+    }
   }
 
   async function handleSaveTemplate() {
@@ -539,6 +565,125 @@ export default function TemplateEditor() {
     setPreviewVersion(null);
     showToast('Version wiederhergestellt — bitte speichern');
   }
+
+  // ── Visual Edit Mode ────────────────────────────────────────────────────
+
+  function injectEditScript(html: string): string {
+    const script = `
+      <script>
+        (function() {
+          function init() {
+            document.querySelectorAll('[data-illusion-ukey]').forEach(function(el) {
+              // Capture phase so we fire before any page-level handlers
+              el.addEventListener('click', function(e) {
+                e.preventDefault();
+                e.stopPropagation();
+                e.stopImmediatePropagation();
+                var isImage = el.tagName === 'IMG' || el.dataset.illusionFieldtype === 'IMAGE';
+                window.parent.postMessage({
+                  type: 'illusion-ukey-click',
+                  ukey: el.dataset.illusionUkey,
+                  dtype: el.dataset.illusionType || 'SKU',
+                  index: parseInt(el.dataset.illusionIndex || '0', 10),
+                  vorlage: el.dataset.illusionVorlage || '',
+                  fieldtype: el.dataset.illusionFieldtype || 'TEXT',
+                  currentValue: isImage ? el.getAttribute('src') : (el.textContent || '').trim()
+                }, '*');
+              }, true); // true = capture phase
+            });
+          }
+          if (document.readyState === 'loading') {
+            document.addEventListener('DOMContentLoaded', init);
+          } else {
+            init();
+          }
+        })();
+      <\/script>
+    `;
+    return html.replace('</body>', script + '</body>');
+  }
+
+  async function loadEditPreview() {
+    if (!iframeRef.current) return;
+    let sku = previewSku;
+    if (!sku) {
+      try {
+        const skus = await getSampleSkus(country, language, 1);
+        if (skus.length > 0) { sku = skus[0]; setPreviewSku(sku); }
+      } catch { /* fall through to EXAMPLE */ }
+    }
+    sku = sku || 'EXAMPLE';
+    try {
+      const response = await fetch(
+        `http://localhost:8078/moonlight/${country}/${language}/product-${sku}?page=${activePage}&editMode=true`
+      );
+      const html = await response.text();
+      iframeRef.current.srcdoc = injectEditScript(html);
+    } catch {
+      showToast('Fehler beim Laden der Edit-Preview', 'error');
+    }
+  }
+
+  async function handleUkeyReplace(oldUkey: string, newUkey: string, index: number, vorlageName: string) {
+    if (!vorlageName) {
+      showToast('⚠ Vorlage-Name fehlt — Template kann nicht gepatcht werden', 'error');
+      return;
+    }
+    try {
+      const html = await loadVorlage(vorlageName);
+      let count = 0;
+      const patched = html.replace(
+        /\$(skuAttr|productAttr)\(([^)]+)\)\$\.(\w+\(\))/g,
+        (match: string, fn: string, ukey: string, method: string) => {
+          if (ukey.toUpperCase() === oldUkey.toUpperCase() && count++ === index) {
+            return `$${fn}(${newUkey})$.${method}`;
+          }
+          return match;
+        }
+      );
+      if (patched === html) {
+        showToast(`⚠ Token „${oldUkey}" (Index ${index}) nicht in „${vorlageName}" gefunden`, 'error');
+        return;
+      }
+      await saveVorlage(vorlageName, patched);
+      // Always switch the editor to the patched vorlage so the user sees the change
+      setActiveVorlage(vorlageName);
+      setHtmlContent(patched);
+      setUkeyClickPopover(null);
+      setPendingNewUkey(null);
+      showToast(`✓ „${oldUkey}" → „${newUkey}" in „${vorlageName}"`);
+      await loadEditPreview();
+    } catch {
+      showToast('Fehler beim Ersetzen des UKey', 'error');
+    }
+  }
+
+  // postMessage listener for visual edit clicks
+  useEffect(() => {
+    function onMessage(e: MessageEvent) {
+      if (e.data?.type === 'illusion-ukey-click') {
+        setUkeyClickPopover({
+          ukey: e.data.ukey,
+          dtype: e.data.dtype,
+          index: Number(e.data.index),
+          vorlage: e.data.vorlage,
+          fieldtype: e.data.fieldtype,
+          currentValue: e.data.currentValue,
+        });
+        setUkeyPopoverSearch('');
+      }
+    }
+    window.addEventListener('message', onMessage);
+    return () => window.removeEventListener('message', onMessage);
+  }, []);
+
+  // Reload edit preview when relevant state changes
+  useEffect(() => {
+    if (editModeOpen) {
+      loadEditPreview();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [editModeOpen, activePage, country, language]);
 
   function handleDeleteVerwendung(slotComponent: string) {
     if (!config) return;
@@ -868,6 +1013,13 @@ export default function TemplateEditor() {
               ⊞ Split
             </button>
 
+            <button
+              onClick={() => setEditModeOpen(true)}
+              title="Visual Edit Mode — klickbare Vollbild-Preview"
+              className="flex items-center gap-1 px-2.5 py-1 rounded text-xs transition-colors bg-slate-700 hover:bg-slate-600 text-slate-200">
+              ✏ Edit
+            </button>
+
             <button onClick={handleOpenHistory}
               title="Versionshistorie"
               className="flex items-center gap-1 px-2.5 py-1 rounded bg-slate-700 hover:bg-slate-600 text-slate-200 text-xs transition-colors">
@@ -1116,6 +1268,198 @@ export default function TemplateEditor() {
                 onClick={() => { setHistoryOpen(false); setPreviewVersion(null); }}
                 className="px-4 py-2 rounded text-sm bg-slate-100 hover:bg-slate-200 text-slate-700"
               >Schließen</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ── Visual Edit: Vollbild-Overlay ────────────────────────────────── */}
+      {editModeOpen && (
+        <div className="fixed inset-0 z-40 flex flex-col bg-white">
+          {/* Header */}
+          <div className="flex items-center gap-3 px-4 h-12 bg-violet-700 text-white shrink-0 shadow-md">
+            <span className="text-sm font-bold tracking-wide">✏ Visual Edit Mode</span>
+            <div className="w-px h-4 bg-violet-500" />
+            <span className="text-xs text-violet-200">Klicke auf einen hervorgehobenen Wert</span>
+            <div className="flex-1" />
+            <input
+              type="text"
+              placeholder="SKU…"
+              value={previewSku}
+              onChange={e => setPreviewSku(e.target.value)}
+              onKeyDown={e => e.key === 'Enter' && loadEditPreview()}
+              className="px-2 py-1 bg-violet-600 border border-violet-400 rounded text-xs text-white placeholder-violet-300 w-32 focus:outline-none focus:ring-1 focus:ring-violet-200"
+            />
+            <button
+              onClick={async () => {
+                const skus = await getSampleSkus(country, language, 1).catch(() => [] as string[]);
+                if (skus.length > 0) setPreviewSku(skus[0]);
+                setTimeout(loadEditPreview, 0);
+              }}
+              title="Beispiel-SKU laden"
+              className="px-2 py-1 rounded bg-violet-600 hover:bg-violet-500 text-violet-100 text-xs transition-colors">
+              🎲
+            </button>
+            <button
+              onClick={loadEditPreview}
+              title="Preview neu laden"
+              className="px-2 py-1 rounded bg-violet-600 hover:bg-violet-500 text-violet-100 text-xs transition-colors">
+              ↺ Neu laden
+            </button>
+            <div className="w-px h-4 bg-violet-500" />
+            <button
+              onClick={() => setEditModeOpen(false)}
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded bg-white/20 hover:bg-white/30 text-white text-xs font-medium transition-colors">
+              ✕ Bearbeitung beenden
+            </button>
+          </div>
+
+          {/* iframe */}
+          <iframe
+            ref={iframeRef}
+            className="flex-1 border-0"
+            sandbox="allow-scripts allow-same-origin"
+          />
+        </div>
+      )}
+
+      {/* ── Visual Edit: UKey-Klick-Modal ─────────────────────────────────── */}
+      {ukeyClickPopover && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60"
+          onClick={() => { setUkeyClickPopover(null); setPendingNewUkey(null); }}>
+          <div className="bg-white rounded-2xl shadow-2xl w-[520px] max-h-[85vh] flex flex-col"
+            onClick={e => e.stopPropagation()}>
+
+            {/* Header */}
+            <div className="flex items-center gap-3 px-5 py-4 border-b border-slate-200 shrink-0">
+              <span className="text-lg">{ukeyClickPopover.fieldtype === 'IMAGE' ? '🖼' : '📝'}</span>
+              <div className="flex-1">
+                <h2 className="text-base font-semibold text-slate-800">UKey auswählen</h2>
+                <p className="text-xs text-slate-500 mt-0.5">
+                  Vorlage: <span className="font-mono text-slate-700">{ukeyClickPopover.vorlage || '—'}</span>
+                </p>
+              </div>
+              <button onClick={() => { setUkeyClickPopover(null); setPendingNewUkey(null); }}
+                className="text-slate-400 hover:text-slate-700 text-xl leading-none">✕</button>
+            </div>
+
+            {/* Current value info */}
+            <div className="px-5 py-3 bg-slate-50 border-b border-slate-200 shrink-0">
+              <div className="flex items-start gap-4">
+                <div>
+                  <p className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider mb-1">Aktueller UKey</p>
+                  <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-mono bg-violet-100 text-violet-800 border border-violet-200 font-semibold">
+                    {ukeyClickPopover.ukey}
+                  </span>
+                </div>
+                <div className="flex-1 min-w-0">
+                  <p className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider mb-1">
+                    {ukeyClickPopover.fieldtype === 'IMAGE' ? 'Bild-URL' : 'Aktueller Wert'}
+                  </p>
+                  {ukeyClickPopover.fieldtype === 'IMAGE' ? (
+                    <img src={ukeyClickPopover.currentValue} alt="" className="h-10 object-contain rounded border border-slate-200 bg-slate-100" />
+                  ) : (
+                    <span className="text-sm text-slate-700 font-medium">
+                      {ukeyClickPopover.currentValue || <em className="text-slate-400">leer</em>}
+                    </span>
+                  )}
+                </div>
+              </div>
+            </div>
+
+            {/* Pending-NewUkey: unmapped warning */}
+            {pendingNewUkey && !mappingConfigs.some(c => c.ukey === pendingNewUkey.ukey) && (
+              <div className="px-5 py-3 bg-amber-50 border-b border-amber-200 shrink-0 flex items-center gap-3">
+                <span className="text-amber-500 text-base">⚠</span>
+                <div className="flex-1 text-xs text-amber-700">
+                  <span className="font-mono font-semibold">{pendingNewUkey.ukey}</span> ist noch nicht gemappt.
+                  Zuerst ein Mapping erstellen?
+                </div>
+                <button
+                  onClick={() => {
+                    setPendingReplacement({ oldUkey: ukeyClickPopover.ukey, index: ukeyClickPopover.index, vorlage: ukeyClickPopover.vorlage });
+                    setQuickMap({ ukey: pendingNewUkey.ukey, dtoType: pendingNewUkey.type });
+                    setUkeyClickPopover(null);
+                    setPendingNewUkey(null);
+                  }}
+                  className="px-3 py-1.5 rounded bg-amber-500 hover:bg-amber-600 text-white text-xs font-medium shrink-0">
+                  ➕ Mapping erstellen
+                </button>
+                <button
+                  onClick={() => handleUkeyReplace(ukeyClickPopover.ukey, pendingNewUkey.ukey, ukeyClickPopover.index, ukeyClickPopover.vorlage)}
+                  className="px-3 py-1.5 rounded bg-slate-200 hover:bg-slate-300 text-slate-700 text-xs font-medium shrink-0">
+                  Trotzdem übernehmen
+                </button>
+              </div>
+            )}
+
+            {/* Search */}
+            <div className="px-4 py-3 border-b border-slate-200 shrink-0">
+              <input
+                autoFocus
+                type="text"
+                placeholder="UKey suchen…"
+                value={ukeyPopoverSearch}
+                onChange={e => { setUkeyPopoverSearch(e.target.value); setPendingNewUkey(null); }}
+                className="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-violet-300"
+              />
+            </div>
+
+            {/* UKey list */}
+            <div className="overflow-y-auto flex-1 py-1">
+              {allUkeysWithType
+                .filter(({ ukey }) => !ukeyPopoverSearch || ukey.toLowerCase().includes(ukeyPopoverSearch.toLowerCase()))
+                .map(({ ukey, type }) => {
+                  const isCurrent = ukey === ukeyClickPopover.ukey;
+                  const isMappedUkey = (type === 'SKU' ? mappedSkuSet : new Set(ukeyInfo.mappedProductUkeys)).has(ukey);
+                  return (
+                    <button
+                      key={`${ukey}-${type}`}
+                      onClick={() => {
+                        if (isCurrent) return; // already set, just leave modal open for other selection
+                        if (!isMappedUkey) {
+                          setPendingNewUkey({ ukey, type });
+                        } else {
+                          handleUkeyReplace(ukeyClickPopover.ukey, ukey, ukeyClickPopover.index, ukeyClickPopover.vorlage);
+                        }
+                      }}
+                      className={`w-full flex items-center gap-2 px-4 py-2 text-left transition-colors ${isCurrent ? 'bg-violet-50 cursor-default' : 'hover:bg-violet-50 cursor-pointer'}`}
+                    >
+                      <span className={`text-[10px] px-1.5 py-0.5 rounded font-mono font-semibold shrink-0 ${type === 'SKU' ? 'bg-blue-100 text-blue-700' : 'bg-purple-100 text-purple-700'}`}>
+                        {type}
+                      </span>
+                      <span className="text-xs font-mono text-slate-700 flex-1">{ukey}</span>
+                      {isCurrent && <span className="text-[10px] text-violet-500 shrink-0">← aktuell</span>}
+                      {isMappedUkey
+                        ? <span className="text-[10px] text-green-500 shrink-0">✔ gemappt</span>
+                        : <span className="text-[10px] text-amber-400 shrink-0">⚠ unmapped</span>
+                      }
+                    </button>
+                  );
+                })
+              }
+              {allUkeysWithType.filter(({ ukey }) => !ukeyPopoverSearch || ukey.toLowerCase().includes(ukeyPopoverSearch.toLowerCase())).length === 0 && (
+                <p className="text-xs text-slate-400 italic text-center py-4">Keine UKeys gefunden</p>
+              )}
+            </div>
+
+            {/* Footer */}
+            <div className="flex items-center justify-between px-5 py-3 border-t border-slate-200 shrink-0">
+              <button
+                onClick={() => {
+                  setPendingReplacement({ oldUkey: ukeyClickPopover.ukey, index: ukeyClickPopover.index, vorlage: ukeyClickPopover.vorlage });
+                  setUkeyClickPopover(null);
+                  setPendingNewUkey(null);
+                  setQuickMap({ ukey: '', dtoType: 'SKU' });
+                }}
+                className="flex items-center gap-1 px-3 py-1.5 rounded text-xs bg-slate-100 hover:bg-slate-200 text-slate-600 font-medium">
+                ➕ Neues Mapping
+              </button>
+              <button
+                onClick={() => { setUkeyClickPopover(null); setPendingNewUkey(null); }}
+                className="px-4 py-2 rounded text-sm bg-slate-100 hover:bg-slate-200 text-slate-700">
+                Schließen
+              </button>
             </div>
           </div>
         </div>

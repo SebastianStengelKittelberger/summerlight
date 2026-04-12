@@ -264,6 +264,7 @@ export default function MapConfigEditor() {
           >
             <option value="STRING">STRING</option>
             <option value="IMAGE">IMAGE</option>
+            <option value="LIST">LIST</option>
           </select>
         </div>
 

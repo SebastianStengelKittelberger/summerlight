@@ -1,7 +1,15 @@
 export type DTOType = 'PRODUCT' | 'SKU' | 'CATEGORY';
 export type TargetType = 'PRODUCT' | 'CATEGORY';
 export type MappingType = 'TEXT' | 'IMAGE' | 'COMPLEX' | 'JAVA_CODE' | 'PRODUCT_VARIANTS';
-export type TargetFieldType = 'STRING' | 'IMAGE';
+export type TargetFieldType = 'STRING' | 'IMAGE' | 'LIST';
+export type PageType = 'PRODUCT_PAGE' | 'CMS_PAGE';
+
+export interface RouteConfig {
+  url: string;
+  pageType: PageType;
+  pageName: string;
+  label: string;
+}
 
 export interface ComplexMapping {
   referencedAttrClasses: string[];

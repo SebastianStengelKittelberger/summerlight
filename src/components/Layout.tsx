@@ -24,6 +24,7 @@ export default function Layout() {
           <NavLink to="/ukeys" className={navClass}>🔍 Ukeys</NavLink>
           <NavLink to="/configs" className={navClass}>📋 Configs</NavLink>
           <NavLink to="/templates" className={navClass}>🎨 Templates</NavLink>
+          <NavLink to="/routing" className={navClass}>🗺 Routing</NavLink>
           <NavLink to="/quality" className={navClass}>📊 Qualität</NavLink>
         </nav>
 
