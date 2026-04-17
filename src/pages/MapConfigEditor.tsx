@@ -3,7 +3,7 @@ import { useSearchParams, useNavigate } from 'react-router-dom';
 import Editor from '@monaco-editor/react';
 import { useAppStore } from '../store/useAppStore';
 import { saveMappingConfig } from '../api/client';
-import type { MapConfig, DTOType, MappingType, TargetFieldType, TargetType } from '../types';
+import type { MapConfig, DTOType, MappingType, TargetFieldType, TargetType, FilterType } from '../types';
 
 const emptyConfig = (): MapConfig => ({
   ukey: '',
@@ -18,6 +18,7 @@ const emptyConfig = (): MapConfig => ({
     referencedAttrClasses: [],
     producttypeAttrClassesToGroup: [],
   },
+  filterConfig: undefined,
 });
 
 interface TagInputProps {
@@ -95,6 +96,7 @@ export default function MapConfigEditor() {
 
   const ukeyParam = searchParams.get('ukey') || '';
   const dtoTypeParam = (searchParams.get('dtoType') as DTOType) || 'PRODUCT';
+  const targetParam = (searchParams.get('target') as TargetType) || 'PRODUCT';
   const indexParam = searchParams.get('index');
   const editIndex = indexParam !== null ? parseInt(indexParam, 10) : null;
 
@@ -103,7 +105,7 @@ export default function MapConfigEditor() {
     if (editIndex !== null && configs[editIndex]) {
       return { ...emptyConfig(), ...configs[editIndex] };
     }
-    return { ...emptyConfig(), ukey: ukeyParam, dtoType: dtoTypeParam };
+    return { ...emptyConfig(), ukey: ukeyParam, dtoType: dtoTypeParam, target: targetParam };
   });
 
   useEffect(() => {
@@ -158,7 +160,7 @@ export default function MapConfigEditor() {
       }
       await saveMappingConfig(country, language, updatedConfigs);
       showToast('MapConfig erfolgreich gespeichert');
-      navigate('/configs');
+      navigate(form.target === 'CATEGORY' ? '/categories' : '/configs');
     } catch (e: unknown) {
       const msg = e instanceof Error ? e.message : 'Speichern fehlgeschlagen';
       showToast(msg, 'error');
@@ -180,7 +182,7 @@ export default function MapConfigEditor() {
           {editIndex !== null ? 'MapConfig bearbeiten' : 'Neue MapConfig'}
         </h2>
         <button
-          onClick={() => navigate('/configs')}
+          onClick={() => navigate(form.target === 'CATEGORY' ? '/categories' : '/configs')}
           className="bg-slate-200 hover:bg-slate-300 text-slate-800 px-4 py-2 rounded text-sm font-medium"
         >
           Abbrechen
@@ -353,6 +355,90 @@ export default function MapConfigEditor() {
             </div>
           </div>
         )}
+
+        {/* ── Filter-Konfiguration ──────────────────────────────────── */}
+        <div className="border border-slate-200 rounded-lg p-4 bg-slate-50 space-y-4">
+          <div className="flex items-center gap-3">
+            <input
+              type="checkbox"
+              id="filterEnabled"
+              checked={form.filterConfig?.enabled ?? false}
+              onChange={(e) => {
+                const enabled = e.target.checked;
+                set('filterConfig', enabled
+                  ? { enabled: true, filterType: 'STANDARD', order: undefined, group: undefined }
+                  : undefined
+                );
+              }}
+              className="w-4 h-4 rounded border-slate-300 text-violet-600 focus:ring-violet-500"
+            />
+            <label htmlFor="filterEnabled" className="text-sm font-semibold text-slate-700">
+              Als Filter verwenden
+            </label>
+          </div>
+
+          {form.filterConfig?.enabled && (
+            <div className="space-y-3 pl-7">
+              {/* FilterType */}
+              <div className="flex items-center gap-4">
+                {(['STANDARD', 'PREDICATE'] as FilterType[]).map((ft) => (
+                  <label key={ft} className="flex items-center gap-1.5 text-sm text-slate-700 cursor-pointer">
+                    <input
+                      type="radio"
+                      name="filterType"
+                      value={ft}
+                      checked={(form.filterConfig?.filterType ?? 'STANDARD') === ft}
+                      onChange={() => set('filterConfig', { ...form.filterConfig!, filterType: ft })}
+                      className="text-violet-600 focus:ring-violet-500"
+                    />
+                    {ft === 'STANDARD' ? 'Standard (Wert aus Mapping)' : 'Predicate (SpEL-Ausdruck)'}
+                  </label>
+                ))}
+              </div>
+
+              {/* Predicate input */}
+              {form.filterConfig?.filterType === 'PREDICATE' && (
+                <div>
+                  <label className="block text-xs font-medium text-slate-600 mb-1">
+                    SpEL-Ausdruck <span className="text-slate-400 font-normal">(z.B. <code>$skuAttr(VOLTAGE)$.getText() == '18V'</code>)</span>
+                  </label>
+                  <input
+                    type="text"
+                    value={form.filterConfig?.predicate ?? ''}
+                    onChange={(e) => set('filterConfig', { ...form.filterConfig!, predicate: e.target.value })}
+                    className="w-full border border-slate-300 rounded px-3 py-1.5 text-sm font-mono focus:ring-2 focus:ring-violet-500 focus:border-violet-500"
+                    placeholder="$skuAttr(UKEY)$.getText() == 'Wert'"
+                  />
+                </div>
+              )}
+
+              {/* Order + Group */}
+              <div className="flex gap-3">
+                <div className="flex-1">
+                  <label className="block text-xs font-medium text-slate-600 mb-1">Reihenfolge</label>
+                  <input
+                    type="number"
+                    value={form.filterConfig?.order ?? ''}
+                    onChange={(e) => set('filterConfig', { ...form.filterConfig!, order: e.target.value ? parseInt(e.target.value) : undefined })}
+                    className="w-full border border-slate-300 rounded px-3 py-1.5 text-sm focus:ring-2 focus:ring-violet-500 focus:border-violet-500"
+                    placeholder="0"
+                    min={0}
+                  />
+                </div>
+                <div className="flex-1">
+                  <label className="block text-xs font-medium text-slate-600 mb-1">Gruppe</label>
+                  <input
+                    type="text"
+                    value={form.filterConfig?.group ?? ''}
+                    onChange={(e) => set('filterConfig', { ...form.filterConfig!, group: e.target.value || undefined })}
+                    className="w-full border border-slate-300 rounded px-3 py-1.5 text-sm focus:ring-2 focus:ring-violet-500 focus:border-violet-500"
+                    placeholder="z.B. Technik"
+                  />
+                </div>
+              </div>
+            </div>
+          )}
+        </div>
       </div>
 
       {/* Actions */}
@@ -365,7 +451,7 @@ export default function MapConfigEditor() {
           {saving ? 'Speichern…' : 'Speichern'}
         </button>
         <button
-          onClick={() => navigate('/configs')}
+          onClick={() => navigate(form.target === 'CATEGORY' ? '/categories' : '/configs')}
           className="bg-slate-200 hover:bg-slate-300 text-slate-800 px-4 py-2 rounded text-sm font-medium"
         >
           Abbrechen

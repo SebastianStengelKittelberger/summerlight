@@ -23,8 +23,10 @@ export default function Layout() {
         <nav className="flex items-center gap-1">
           <NavLink to="/ukeys" className={navClass}>🔍 Ukeys</NavLink>
           <NavLink to="/configs" className={navClass}>📋 Configs</NavLink>
+          <NavLink to="/categories" className={navClass}>🗂 Kategorien</NavLink>
           <NavLink to="/templates" className={navClass}>🎨 Templates</NavLink>
           <NavLink to="/routing" className={navClass}>🗺 Routing</NavLink>
+          <NavLink to="/filter-labels" className={navClass}>🔎 Filter-Labels</NavLink>
           <NavLink to="/quality" className={navClass}>📊 Qualität</NavLink>
         </nav>
 

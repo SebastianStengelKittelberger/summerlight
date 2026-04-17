@@ -6,6 +6,7 @@ import type { RouteConfig, PageType } from '../types';
 const PAGE_TYPES: { value: PageType; label: string }[] = [
   { value: 'CMS_PAGE', label: '📄 CMS-Seite' },
   { value: 'PRODUCT_PAGE', label: '🛒 Produktseite' },
+  { value: 'CATEGORY_PAGE', label: '🗂 Kategorieseite' },
 ];
 
 const emptyRoute = (): RouteConfig => ({
@@ -144,6 +145,8 @@ export default function RoutingEditor() {
                     <span className={`text-[11px] px-2 py-0.5 rounded-full font-medium ${
                       route.pageType === 'CMS_PAGE'
                         ? 'bg-blue-100 text-blue-700'
+                        : route.pageType === 'CATEGORY_PAGE'
+                        ? 'bg-emerald-100 text-emerald-700'
                         : 'bg-amber-100 text-amber-700'
                     }`}>
                       {PAGE_TYPES.find(t => t.value === route.pageType)?.label ?? route.pageType}
@@ -214,6 +217,11 @@ export default function RoutingEditor() {
                 {editDraft.pageType === 'PRODUCT_PAGE' && (
                   <p className="text-[10px] text-slate-400 mt-1">
                     Der URL-Pfad muss <code>&#123;sku&#125;</code> enthalten, z.B. <code>/products/&#123;sku&#125;</code>
+                  </p>
+                )}
+                {editDraft.pageType === 'CATEGORY_PAGE' && (
+                  <p className="text-[10px] text-slate-400 mt-1">
+                    Der URL-Pfad muss <code>&#123;categoryUkey&#125;</code> enthalten, z.B. <code>/kategorien/&#123;categoryUkey&#125;</code>
                   </p>
                 )}
               </label>

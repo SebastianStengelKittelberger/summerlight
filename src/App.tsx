@@ -6,6 +6,9 @@ import MapConfigEditor from './pages/MapConfigEditor';
 import TemplateEditor from './pages/TemplateEditor';
 import DataQualityDashboard from './pages/DataQualityDashboard';
 import RoutingEditor from './pages/RoutingEditor';
+import FilterLabelEditor from './pages/FilterLabelEditor';
+
+import CategoryMappingList from './pages/CategoryMappingList';
 
 export default function App() {
   return (
@@ -15,10 +18,12 @@ export default function App() {
           <Route index element={<Navigate to="/ukeys" replace />} />
           <Route path="ukeys" element={<UkeyExplorer />} />
           <Route path="configs" element={<MappingConfigList />} />
+          <Route path="categories" element={<CategoryMappingList />} />
           <Route path="editor" element={<MapConfigEditor />} />
           <Route path="templates" element={<TemplateEditor />} />
           <Route path="quality" element={<DataQualityDashboard />} />
           <Route path="routing" element={<RoutingEditor />} />
+          <Route path="filter-labels" element={<FilterLabelEditor />} />
         </Route>
       </Routes>
     </BrowserRouter>

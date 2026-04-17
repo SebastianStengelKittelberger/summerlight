@@ -49,6 +49,14 @@ export function applyMappingConfig(
   return api.post(`/${country}/${language}/index`, configs).then((r) => r.data);
 }
 
+export function applyCategoryMappingConfig(
+  country: string,
+  language: string,
+  configs: MapConfig[],
+): Promise<unknown> {
+  return api.post(`/${country}/${language}/index/categories`, configs).then((r) => r.data);
+}
+
 const moonlightApi = axios.create({
   baseURL: 'http://localhost:8078/moonlight',
   headers: { 'Content-Type': 'application/json' },
@@ -136,4 +144,18 @@ export function loadRoutes(country: string, language: string): Promise<import('.
 
 export function saveRoutes(country: string, language: string, routes: import('../types').RouteConfig[]): Promise<void> {
   return moonlightApi.put(`/${country}/${language}/routes`, routes).then(() => undefined);
+}
+
+// ── Filter Labels ─────────────────────────────────────────────────────────────
+
+export function loadFilterLabels(country: string, language: string): Promise<Record<string, string>> {
+  return api.get<Record<string, string>>(`/${country}/${language}/filter-labels`).then(r => r.data);
+}
+
+export function saveFilterLabels(country: string, language: string, labels: Record<string, string>): Promise<void> {
+  return api.put(`/${country}/${language}/filter-labels`, labels).then(() => undefined);
+}
+
+export function loadFilterConfig(country: string, language: string): Promise<import('../types').FilterConfigEntry[]> {
+  return api.get<import('../types').FilterConfigEntry[]>(`/${country}/${language}/filter-config`).then(r => r.data);
 }
